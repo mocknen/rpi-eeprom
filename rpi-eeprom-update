@@ -138,6 +138,19 @@ getBootloaderConfig() {
    fi
 }
 
+getBootloaderImage() {
+   flashrom_out=${1:?}
+   [ -n "${SPIDEV}" ] || chipNotSupported
+   [ "${RPI_EEPROM_USE_FLASHROM}" -eq 1 ] || die 'RPI_EEPROM_USE_FLASHROM is not 1'
+   [ "$(id -u)" -eq 0 ] || die '* Must be run as root'
+
+   FLASHROM_LOG="$(mktemp)"
+   if ! flashrom -p linux_spi:dev="${SPIDEV}",spispeed=16000 -r "${flashrom_out}" > "${FLASHROM_LOG}"; then
+      cat "${FLASHROM_LOG}" >&2
+      die 'FLASHROM READ FAILED'
+   fi
+}
+
 prepareImage()
 {
    [ -f "${BOOTLOADER_UPDATE_IMAGE}" ] || die "EEPROM image '${BOOTLOADER_UPDATE_IMAGE}' not found"
@@ -927,7 +940,7 @@ if [ ! -d "${PACKAGE_INFO_DIR}" ]; then
 fi
 
 
-while getopts A:abdhilf:m:ju:rs option; do
+while getopts A:abdg:hilf:m:ju:rs option; do
    case "${option}" in
    A)
       if [ "${OPTARG}" = "bootloader" ]; then
@@ -949,6 +962,11 @@ while getopts A:abdhilf:m:ju:rs option; do
    d) OVERWRITE_CONFIG=1
       ;;
    f) BOOTLOADER_UPDATE_IMAGE="${OPTARG}"
+      ;;
+   g)
+      checkDependencies
+      getBootloaderImage "${OPTARG}"
+      exit 0
       ;;
    i)
       # Script default is 1 but this could have been set to zero in the defaults file
